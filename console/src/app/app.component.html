@@ -1,0 +1,273 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">◈</span
+      ><span>THREADLINE<small>WORKFLOW SYSTEMS</small></span>
+    </div>
+    <div class="side-label">WORKSPACE</div>
+    <div class="nav-item active"><span>▦</span> Operations board</div>
+    <div class="side-label second">SYSTEM STATUS</div>
+    <div class="system-row">
+      <span class="dot" [class.warning]="health().consumerPaused"></span> Kafka
+      consumer
+      <strong>{{ health().consumerPaused ? "Paused" : "Running" }}</strong>
+    </div>
+    <div class="system-row">
+      <span class="dot"></span> Outbox queue
+      <strong>{{ health().pendingOutbox }}</strong>
+    </div>
+    <div class="sidebar-foot">
+      POSTGRESQL → KAFKA → MONGODB<br /><span>At least once delivery</span>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <span>Overview <span class="slash">/</span> Practices</span>
+      <div class="top-right">
+        <span class="live-dot"></span> LIVE CONSOLE
+        <span class="avatar">TL</span>
+      </div>
+    </header>
+    <div class="content">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">OPERATIONS / 01</p>
+          <h1>Practice workflow</h1>
+          <p class="subtitle">
+            Create, document, and approve a practice. Watch the event stream
+            update the read model.
+          </p>
+        </div>
+        <button class="refresh" (click)="refresh()">↻ &nbsp;Refresh</button>
+      </div>
+      @if (error()) {
+        <div class="alert error" role="alert">{{ error() }}</div>
+      }
+      @if (notice()) {
+        <div class="alert success">{{ notice() }}</div>
+      }
+
+      <div class="metric-grid">
+        <div class="metric">
+          <span>ALL PRACTICES</span><strong>{{ practices().length }}</strong
+          ><small>Authoritative records</small>
+        </div>
+        <div class="metric">
+          <span>APPROVED</span><strong>{{ approvedCount() }}</strong
+          ><small>Completed workflows</small>
+        </div>
+        <div class="metric">
+          <span>EVENTS WAITING</span
+          ><strong>{{ health().pendingOutbox }}</strong
+          ><small>PostgreSQL outbox</small>
+        </div>
+        <div class="metric accent">
+          <span>PROJECTION</span
+          ><strong>{{ health().consumerPaused ? "Paused" : "Active" }}</strong
+          ><small>MongoDB dashboard</small>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <section class="panel list-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">QUEUE</p>
+              <h2>Practices</h2>
+            </div>
+            <span class="count">{{ practices().length }}</span>
+          </div>
+          <form
+            class="create-form"
+            (submit)="$event.preventDefault(); create()"
+          >
+            <label for="new-title">NEW PRACTICE</label>
+            <div class="create-row">
+              <input
+                id="new-title"
+                [value]="title()"
+                (input)="title.set($any($event.target).value)"
+                placeholder="e.g. Equipment access request"
+                maxlength="160"
+              /><button type="submit" [disabled]="busy() || !title().trim()">
+                Create
+              </button>
+            </div>
+          </form>
+          <div class="practice-list">
+            @for (practice of practices(); track practice.id) {
+              <button
+                class="practice-item"
+                [class.selected]="selectedId() === practice.id"
+                (click)="selectedId.set(practice.id)"
+              >
+                <span class="item-icon">▤</span
+                ><span class="item-copy"
+                  ><strong>{{ practice.title }}</strong
+                  ><small
+                    >{{ practice.id.slice(0, 8) }} · v{{
+                      practice.version
+                    }}</small
+                  ></span
+                ><span
+                  class="status"
+                  [class.approved]="practice.status === 'APPROVED'"
+                  >{{ practice.status }}</span
+                >
+              </button>
+            } @empty {
+              <p class="empty">No practices yet. Create one above.</p>
+            }
+          </div>
+        </section>
+
+        <section class="panel detail-panel">
+          @if (selected(); as practice) {
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">SELECTED PRACTICE</p>
+                <h2>{{ practice.title }}</h2>
+              </div>
+              <span
+                class="status large"
+                [class.approved]="practice.status === 'APPROVED'"
+                >{{ practice.status }}</span
+              >
+            </div>
+            <div class="identity">
+              ID <code>{{ practice.id }}</code>
+            </div>
+            <div class="consistency" [class.delayed]="lag() > 0">
+              <span class="dot" [class.warning]="lag() > 0"></span>
+              <div>
+                <strong>{{
+                  lag() > 0 ? "Dashboard catching up" : "Dashboard in sync"
+                }}</strong
+                ><small
+                  >PostgreSQL v{{ practice.version }} · MongoDB v{{
+                    projection()?.lastSequence ?? 0
+                  }}
+                  <span class="separator">·</span> {{ lag() }} event{{
+                    lag() === 1 ? "" : "s"
+                  }}
+                  behind</small
+                >
+              </div>
+            </div>
+            <div class="section-label">WORKFLOW ACTIONS</div>
+            <div class="steps">
+              <div class="step done">
+                <span>1</span>
+                <div>
+                  <strong>Create practice</strong
+                  ><small>Saved in PostgreSQL</small>
+                </div>
+                <b>✓</b>
+              </div>
+              <div class="step" [class.done]="practice.version >= 2">
+                <span>2</span>
+                <div>
+                  <strong>Upload document</strong
+                  ><small>Stored with checksum</small>
+                </div>
+                @if (practice.version >= 2) {
+                  <b>✓</b>
+                }
+              </div>
+              <div class="step" [class.done]="practice.version >= 3">
+                <span>3</span>
+                <div>
+                  <strong>Approve practice</strong
+                  ><small>Validated state transition</small>
+                </div>
+                @if (practice.version >= 3) {
+                  <b>✓</b>
+                }
+              </div>
+            </div>
+            <div class="actions">
+              <label
+                class="upload"
+                [class.disabled]="practice.status !== 'CREATED' || busy()"
+                >↑ &nbsp; Upload document<input
+                  type="file"
+                  accept=".txt,.pdf,.md"
+                  [disabled]="practice.status !== 'CREATED' || busy()"
+                  (change)="upload($any($event.target))" /></label
+              ><button
+                class="approve"
+                [disabled]="practice.status !== 'DOCUMENTED' || busy()"
+                (click)="approve()"
+              >
+                ✓ &nbsp; Approve
+              </button>
+            </div>
+            <div class="section-label history-heading">
+              EVENT HISTORY <span>FROM MONGODB PROJECTION</span>
+            </div>
+            <div class="timeline">
+              @for (event of projection()?.events ?? []; track event.eventId) {
+                <div class="timeline-item">
+                  <span class="timeline-dot"></span>
+                  <div>
+                    <strong>{{ event.description }}</strong
+                    ><small
+                      >{{ event.type }} · event #{{ event.sequence }} ·
+                      {{ event.occurredAt | date: "medium" }}</small
+                    >
+                  </div>
+                </div>
+              }
+              @if (!projection()?.events?.length) {
+                <p class="empty">Waiting for the first Kafka event.</p>
+              }
+            </div>
+          } @else {
+            <div class="empty-detail">
+              Select a practice to inspect its workflow.
+            </div>
+          }
+        </section>
+      </div>
+
+      <section class="lab-panel">
+        <div>
+          <p class="eyebrow">RESILIENCE CONTROLS</p>
+          <h2>Exercise the recovery path</h2>
+          <p>
+            Pause delivery, retry a failed event, resend a duplicate, or rebuild
+            MongoDB from Kafka. Duplicates ignored:
+            {{ health().duplicateDeliveries }}.
+          </p>
+        </div>
+        <div class="lab-actions">
+          <button
+            [disabled]="busy() || health().consumerPaused"
+            (click)="control('pause')"
+          >
+            Pause consumer</button
+          ><button
+            [disabled]="busy() || !health().consumerPaused"
+            (click)="control('resume')"
+          >
+            Resume</button
+          ><button [disabled]="busy()" (click)="control('fail-next')">
+            Fail next event</button
+          ><button
+            [disabled]="busy() || !selectedId()"
+            (click)="duplicateLast()"
+          >
+            Resend last event</button
+          ><button [disabled]="busy()" (click)="control('rebuild')">
+            Rebuild view
+          </button>
+        </div>
+      </section>
+      <footer>
+        THREADLINE / FICTIONAL OPERATIONS DATA
+        <span>PostgreSQL is authoritative · MongoDB is a derived view</span>
+      </footer>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,44 @@
+server:
+  port: ${PORT:8092}
+spring:
+  application:
+    name: reliable-workflow-platform
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5435/workflow}
+    username: ${DB_USER:workflow}
+    password: ${DB_PASSWORD:workflow}
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27018/workflow}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9094}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        acks: all
+        enable.idempotence: true
+    consumer:
+      group-id: workflow-dashboard
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+    listener:
+      ack-mode: record
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+workflow:
+  topic: practice-events
+  outbox-delay-ms: 500
+logging:
+  level:
+    root: INFO
+    org.apache.kafka: WARN

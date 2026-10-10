@@ -1,0 +1,4 @@
+Synthetic request: renew access for the Northstar Lab test workspace.
+Requested by: fictional operations account.
+Scope: local workflow validation only.
+No personal, customer, or company data is included.
